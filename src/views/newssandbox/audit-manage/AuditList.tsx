@@ -2,20 +2,20 @@
  * @Author: Aaron
  * @Date: 2022/7/21
  */
-import React, {useEffect, useState} from 'react';
-import axios from "axios";
-import {Button, notification, Table, Tag} from "antd";
-import {ColumnsType} from "antd/es/table";
-import {Link, useNavigate} from "react-router-dom";
+import React, { useEffect, useState } from 'react'
+import axios from 'axios'
+import { Button, notification, Table, Tag } from 'antd'
+import { ColumnsType } from 'antd/es/table'
+import { Link, useNavigate } from 'react-router-dom'
 
 interface ICategory {
-    title: string;
-    value: string;
+    title: string
+    value: string
 }
 
 interface IDataType {
-    id: string;
-    title: string;
+    id: string
+    title: string
     auditState: number
     author: string
     category: ICategory
@@ -28,14 +28,13 @@ interface IDataType {
 
 export default function AuditList() {
     const navigation = useNavigate()
-    const [dataSource, setDataSource] = useState([]);
-    const {username} = JSON.parse(localStorage.getItem('token') as string)[0]
+    const [dataSource, setDataSource] = useState([])
+    const { username } = JSON.parse(localStorage.getItem('token') as string)
     useEffect(() => {
-        axios(`/news?author=${username}&auditState_ne=0&publishState_lte=1&_expand=category`)
-            .then(res => {
-                setDataSource(res.data)
-            })
-    }, []);
+        axios(`/api/news/lists/audit/${username}`).then(res => {
+            setDataSource(res.data.data)
+        })
+    }, [])
     const columns: ColumnsType<IDataType> = [
         {
             title: '新闻标题',
@@ -49,14 +48,14 @@ export default function AuditList() {
         {
             title: '新闻分类',
             dataIndex: 'category',
-            render: (category) => {
+            render: category => {
                 return <span>{category.title}</span>
             }
         },
         {
             title: '审核状态',
             dataIndex: 'auditState',
-            render: (auditState) => {
+            render: auditState => {
                 const auditList = ['未审核', '审核中', '已通过', '未通过']
                 const colorList = ['', 'orange', 'green', 'red']
                 return <Tag color={colorList[auditState]}>{auditList[auditState]}</Tag>
@@ -64,46 +63,71 @@ export default function AuditList() {
         },
         {
             title: '操作',
-            render: (item) => <div>
-                {item.auditState === 1 && <Button onClick={() => handleRevert(item)}>撤销</Button>}
-                {item.auditState === 2 && <Button onClick={() => handlePublish(item)} type="primary">发布</Button>}
-                {item.auditState === 3 && <Button onClick={() => handleUpdate(item)} danger>修改</Button>}
-            </div>
-        },
+            render: item => (
+                <div>
+                    {item.auditState === 1 && <Button onClick={() => handleRevert(item)}>撤销</Button>}
+                    {item.auditState === 2 && (
+                        <Button onClick={() => handlePublish(item)} type="primary">
+                            发布
+                        </Button>
+                    )}
+                    {item.auditState === 3 && (
+                        <Button onClick={() => handleUpdate(item)} danger>
+                            修改
+                        </Button>
+                    )}
+                </div>
+            )
+        }
     ]
     const handlePublish = (item: IDataType) => {
-        axios.patch(`/news/${item.id}`, {
-            publishState: 2,
-            publishTime: Date.now()
-        }).then(res => {
-            navigation('/publish-manage/published')
-            notification.info({
-                message: `通知`,
-                description: `您可以到[发布管理/已经发布]中查看您的新闻`,
-                placement: 'bottomRight'
-            });
-        })
+        axios
+            .post(`/api/news/releaseNews/${item.id}`, {
+                publishState: 2,
+                publishTime: Date.now()
+            })
+            .then(res => {
+                navigation('/publish-manage/published')
+                notification.info({
+                    message: `通知`,
+                    description: `您可以到[发布管理/已经发布]中查看您的新闻`,
+                    placement: 'bottomRight'
+                })
+            })
     }
     const handleUpdate = (item: IDataType) => {
         navigation(`/news-manage/update/${item.id}`)
     }
     const handleRevert = (item: IDataType) => {
         setDataSource(dataSource.filter((data: IDataType) => data.id !== item.id))
-        axios.patch(`/news/${item.id}`, {
-            auditState: 0
+        axios({
+            method: 'post',
+            url: `/api/news/updateAuditState`,
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+            data: {
+                id: item.id,
+                auditState: 0
+            }
         }).then(res => {
             notification.info({
                 message: `通知`,
                 description: `您可以到草稿箱中更新您的新闻`,
                 placement: 'bottomRight'
-            });
+            })
         })
     }
     return (
         <div>
-            <Table rowKey={(item: any) => item.id} dataSource={dataSource} columns={columns} pagination={{
-                pageSize: 5
-            }}/>
+            <Table
+                rowKey={(item: any) => item.id}
+                dataSource={dataSource}
+                columns={columns}
+                pagination={{
+                    pageSize: 5
+                }}
+            />
         </div>
-    );
+    )
 }
